@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>テキスト編集ツール集</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>テキスト編集ツール集</h1>
+
+      <div class="tool-selector">
+        <label for="tool-select">ツールを選択:</label>
+        <select id="tool-select">
+          <option value="quote">引用付加（&gt; を先頭に追加）</option>
+          <option value="uppercase">大文字変換</option>
+          <option value="lowercase">小文字変換</option>
+          <option value="trim">前後の空白除去</option>
+          <option value="trim-lines">各行の前後の空白除去</option>
+          <option value="number-lines">行番号付加</option>
+          <option value="remove-empty-lines">空行削除</option>
+          <option value="add-prefix">プレフィックス追加</option>
+          <option value="add-suffix">サフィックス追加</option>
+          <option value="reverse-lines">行の逆順</option>
+          <option value="sort-lines">行のソート</option>
+          <option value="unique-lines">重複行の削除</option>
+          <option value="count-chars">文字数カウント</option>
+        </select>
+      </div>
+
+      <div class="option-area" id="option-area" style="display: none;">
+        <label for="option-input" id="option-label">オプション:</label>
+        <input type="text" id="option-input" placeholder="値を入力" />
+      </div>
+
+      <div class="text-areas">
+        <div class="text-area-wrapper">
+          <label for="input-text">入力:</label>
+          <textarea id="input-text" rows="10" placeholder="ここにテキストを入力..."></textarea>
+        </div>
+        <div class="button-area">
+          <button id="convert-btn" type="button">変換 ▶</button>
+          <button id="copy-btn" type="button">コピー</button>
+          <button id="clear-btn" type="button">クリア</button>
+        </div>
+        <div class="text-area-wrapper">
+          <label for="output-text">出力:</label>
+          <textarea id="output-text" rows="10" readonly placeholder="変換結果がここに表示される"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

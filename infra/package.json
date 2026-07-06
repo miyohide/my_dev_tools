@@ -1,0 +1,17 @@
+{
+  "name": "my-dev-tools-infra",
+  "version": "1.0.0",
+  "description": "テキスト編集ツール集のインフラ構成（CloudFront + S3）",
+  "scripts": {
+    "build": "tsc",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "diff": "cdk diff"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.150.0",
+    "aws-cdk-lib": "^2.150.0",
+    "constructs": "^10.3.0",
+    "typescript": "^5.5.0"
+  }
+}
