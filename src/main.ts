@@ -1,5 +1,7 @@
 import { transform, toolOptions, type ToolId } from "./tools";
 
+declare const __APP_VERSION__: string;
+
 function main(): void {
   const toolSelect = document.getElementById("tool-select") as HTMLSelectElement;
   const inputText = document.getElementById("input-text") as HTMLTextAreaElement;
@@ -56,6 +58,12 @@ function main(): void {
 
   // Initialize option visibility
   updateOptionVisibility();
+
+  // Display version
+  const versionEl = document.getElementById("app-version");
+  if (versionEl) {
+    versionEl.textContent = `v${__APP_VERSION__}`;
+  }
 }
 
 document.addEventListener("DOMContentLoaded", main);
