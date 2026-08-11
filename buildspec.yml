@@ -10,9 +10,9 @@ phases:
       - npm ci
       - npm run build
 
-  # post_build:
-  #   commands:
-  #     - aws s3 sync dist/ s3://${DEPLOY_BUCKET}/ --delete
+  post_build:
+    commands:
+      - aws s3 sync dist/ s3://${DEPLOY_BUCKET}/ --delete
 
 artifacts:
   files:
