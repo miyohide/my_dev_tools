@@ -24,7 +24,8 @@ export type ToolId =
   | "tsv-to-csv"
   | "to-camel-case"
   | "to-snake-case"
-  | "to-kebab-case";
+  | "to-kebab-case"
+  | "subnet-calc";
 
 export interface ToolOption {
   /** Whether this tool requires an additional option input */
@@ -66,6 +67,11 @@ export const toolOptions: Record<ToolId, ToolOption> = {
   "to-camel-case": { requiresOption: false },
   "to-snake-case": { requiresOption: false },
   "to-kebab-case": { requiresOption: false },
+  "subnet-calc": {
+    requiresOption: true,
+    optionLabel: "サブネットマスク（プレフィックス長）:",
+    optionPlaceholder: "例: 24 または 28",
+  },
 };
 
 /**
@@ -117,6 +123,8 @@ export function transform(toolId: ToolId, input: string, option?: string): strin
       return toSnakeCase(input);
     case "to-kebab-case":
       return toKebabCase(input);
+    case "subnet-calc":
+      return subnetCalc(input, option ?? "");
     default:
       return input;
   }
@@ -641,4 +649,122 @@ function splitIntoWords(str: string): string[] {
   const expanded = str.replace(/([a-z])([A-Z])/g, "$1\0$2");
   // Split by separators and boundary markers
   return expanded.split(/[\s_\-.\0]+/).filter((w) => w.length > 0);
+}
+
+// =============================================================================
+// Network tools
+// =============================================================================
+
+/** Calculate subnet CIDR candidates from a VPC CIDR and subnet prefix length */
+export function subnetCalc(vpcCidr: string, subnetPrefix: string): string {
+  const cidr = vpcCidr.trim();
+  const prefix = subnetPrefix.trim();
+
+  if (!cidr) {
+    return "エラー: VPCのCIDRを入力してください（例: 10.0.0.0/16）";
+  }
+  if (!prefix) {
+    return "エラー: サブネットマスク（プレフィックス長）を入力してください（例: 24）";
+  }
+
+  // Parse VPC CIDR
+  const cidrMatch = cidr.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/);
+  if (!cidrMatch) {
+    return "エラー: 無効なCIDR形式です。例: 10.0.0.0/16";
+  }
+
+  const octets = [
+    parseInt(cidrMatch[1]),
+    parseInt(cidrMatch[2]),
+    parseInt(cidrMatch[3]),
+    parseInt(cidrMatch[4]),
+  ];
+
+  // Validate octets
+  if (octets.some((o) => o < 0 || o > 255)) {
+    return "エラー: IPアドレスの各オクテットは0〜255の範囲で指定してください";
+  }
+
+  const vpcPrefix = parseInt(cidrMatch[5]);
+  if (vpcPrefix < 0 || vpcPrefix > 32) {
+    return "エラー: VPCのプレフィックス長は0〜32の範囲で指定してください";
+  }
+
+  // Parse subnet prefix
+  const subnetPrefixNum = parseInt(prefix);
+  if (isNaN(subnetPrefixNum) || subnetPrefixNum < 0 || subnetPrefixNum > 32) {
+    return "エラー: サブネットのプレフィックス長は0〜32の範囲の数値で指定してください";
+  }
+
+  if (subnetPrefixNum <= vpcPrefix) {
+    return `エラー: サブネットのプレフィックス長（/${subnetPrefixNum}）はVPCのプレフィックス長（/${vpcPrefix}）より大きくしてください`;
+  }
+
+  // AWS restriction: subnet prefix must be between /16 and /28
+  if (subnetPrefixNum < 16 || subnetPrefixNum > 28) {
+    return "エラー: AWSのサブネットプレフィックス長は /16 〜 /28 の範囲で指定してください";
+  }
+
+  // Calculate network address from VPC CIDR
+  const vpcIp = ipToNumber(octets);
+  const vpcMask = prefixToMask(vpcPrefix);
+  const networkAddr = vpcIp & vpcMask;
+
+  // Calculate subnets
+  const subnetMask = prefixToMask(subnetPrefixNum);
+  const subnetSize = ~subnetMask >>> 0; // Number of host addresses (including network and broadcast)
+  const subnetCount = 1 << (subnetPrefixNum - vpcPrefix);
+  const hostsPerSubnet = (1 << (32 - subnetPrefixNum)) - 5; // AWS reserves 5 IPs per subnet
+
+  const lines: string[] = [];
+  lines.push(`VPC CIDR: ${cidr}`);
+  lines.push(`VPC IPアドレス範囲: ${numberToIp(networkAddr)} 〜 ${numberToIp((networkAddr + ~vpcMask) >>> 0)}`);
+  lines.push(`VPC 総IPアドレス数: ${(~vpcMask >>> 0) + 1}`);
+  lines.push("");
+  lines.push(`サブネットマスク: /${subnetPrefixNum}`);
+  lines.push(`分割可能なサブネット数: ${subnetCount}`);
+  lines.push(`サブネットあたりの利用可能IPアドレス数: ${hostsPerSubnet > 0 ? hostsPerSubnet : 0}（AWS予約5個を除く）`);
+  lines.push("");
+  lines.push("─".repeat(60));
+  lines.push("サブネット候補一覧:");
+  lines.push("─".repeat(60));
+
+  for (let i = 0; i < subnetCount; i++) {
+    const subnetAddr = (networkAddr + i * (subnetSize + 1)) >>> 0;
+    const subnetEnd = (subnetAddr + subnetSize) >>> 0;
+    const firstUsable = (subnetAddr + 4) >>> 0; // AWS reserves first 4
+    const lastUsable = (subnetEnd - 1) >>> 0; // AWS reserves last 1 (broadcast)
+
+    lines.push("");
+    lines.push(`[サブネット ${i + 1}]`);
+    lines.push(`  CIDR:          ${numberToIp(subnetAddr)}/${subnetPrefixNum}`);
+    lines.push(`  ネットワーク:  ${numberToIp(subnetAddr)}`);
+    lines.push(`  ブロードキャスト: ${numberToIp(subnetEnd)}`);
+    if (hostsPerSubnet > 0) {
+      lines.push(`  利用可能範囲:  ${numberToIp(firstUsable)} 〜 ${numberToIp(lastUsable)}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/** Convert 4 octets to a 32-bit unsigned integer */
+function ipToNumber(octets: number[]): number {
+  return ((octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3]) >>> 0;
+}
+
+/** Convert a 32-bit unsigned integer to dotted-decimal IP string */
+function numberToIp(num: number): string {
+  return [
+    (num >>> 24) & 0xff,
+    (num >>> 16) & 0xff,
+    (num >>> 8) & 0xff,
+    num & 0xff,
+  ].join(".");
+}
+
+/** Convert a prefix length to a 32-bit subnet mask */
+function prefixToMask(prefix: number): number {
+  if (prefix === 0) return 0;
+  return (~0 << (32 - prefix)) >>> 0;
 }

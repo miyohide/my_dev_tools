@@ -23,6 +23,13 @@ function main(): void {
       optionArea.style.display = "none";
       optionInput.value = "";
     }
+
+    // Update input placeholder based on tool
+    if (toolId === "subnet-calc") {
+      inputText.placeholder = "VPCのCIDRを入力（例: 10.0.0.0/16）";
+    } else {
+      inputText.placeholder = "ここにテキストを入力...";
+    }
   }
 
   toolSelect.addEventListener("change", updateOptionVisibility);
